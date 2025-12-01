@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="be">
 <head>
     <meta charset="utf-8" />
@@ -50,20 +50,17 @@
         }
 
         /* --- СТЫЛІ ДЛЯ ПОДПІСАЎ --- */
-        
-        /* Стыль для Ледавіка (заўсёды бачны) */
         .glacier-label {
             background: transparent;
             border: none;
             box-shadow: none;
-            color: #006994; /* Сіні колер */
+            color: #006994;
             font-size: 14px;
             font-weight: bold;
             text-transform: uppercase;
             text-shadow: 1px 1px 2px white;
         }
 
-        /* Стыль для Культур (пры навядзенні) */
         .culture-label {
             font-size: 12px;
             font-weight: bold;
@@ -97,9 +94,8 @@
             maxZoom: 19
         }).addTo(map);
 
-        // 2. Шкала часу (Адзіны крок 1000 гадоў)
+        // 2. Шкала часу
         var timeline = [];
-        // Ад -30 000 да 0 (нараджэнне Хрыстова)
         for (let y = -30000; y <= 0; y += 1000) { 
             timeline.push(y); 
         }
@@ -114,7 +110,6 @@
             return y < 0 ? Math.abs(y) + " да н.э." : y + " н.э.";
         }
 
-        // Пераменныя для захоўвання дадзеных
         var allData = null;      
         var currentLayer = null; 
 
@@ -130,7 +125,17 @@
                 display.innerText = "Памылка загрузкі файла data/all_cultures.geojson";
             });
 
-        // 4. Функцыя абнаўлення мапы
+        // --- НОВАЯ ФУНКЦЫЯ: Падлік плошчы для сартыроўкі ---
+        function getFeatureArea(feature) {
+            if (!feature.geometry) return 0;
+            var layer = L.geoJSON(feature);
+            var bounds = layer.getBounds();
+            var width = bounds.getEast() - bounds.getWest();
+            var height = bounds.getNorth() - bounds.getSouth();
+            return width * height;
+        }
+
+        // 4. Функцыя абнаўлення мапы (ВЫПРАЎЛЕНАЯ)
         function updateMap() {
             if (!allData) return; 
 
@@ -138,21 +143,25 @@
             var currentYear = timeline[index];
             display.innerText = formatYear(currentYear);
 
-            // Выдаляем стары пласт
             if (currentLayer) {
                 map.removeLayer(currentLayer);
             }
 
-            // Ствараем новы пласт
-            currentLayer = L.geoJSON(allData, {
-                
-                // Фільтр па гадах
-                filter: function(feature) {
-                    return (currentYear >= feature.properties.startYear && 
-                            currentYear <= feature.properties.endYear);
-                },
+            // КРОК А: Фільтруем спіс уручную
+            var visibleFeatures = allData.features.filter(function(feature) {
+                return (currentYear >= feature.properties.startYear && 
+                        currentYear <= feature.properties.endYear);
+            });
 
-                // Стыль
+            // КРОК Б: Сартуем (Вялікія -> Маленькія)
+            // Гэта гарантуе, што маленькія культуры лягуць ПАВЕРХ вялікіх
+            visibleFeatures.sort(function(a, b) {
+                return getFeatureArea(b) - getFeatureArea(a);
+            });
+
+            // КРОК В: Ствараем пласт ужо з адсартаванымі дадзенымі
+            currentLayer = L.geoJSON({type: "FeatureCollection", features: visibleFeatures}, {
+                
                 style: function(feature) {
                     return {
                         fillColor: feature.properties.color || '#3388ff',
@@ -163,19 +172,15 @@
                     };
                 },
 
-                // Паводзіны (Навядзенне і Подпісы)
                 onEachFeature: function(feature, layer) {
-                    
-                    // А. ЛОГІКА ПОДПІСАЎ
+                    // Логіка подпісаў
                     if (feature.properties.type === 'glacier') {
-                        // Ледавік: пастаянны подпіс
                         layer.bindTooltip(feature.properties.name, {
                             permanent: true,
                             direction: "center",
                             className: "glacier-label"
                         });
                     } else {
-                        // Культуры: подпіс пры навядзенні
                         layer.bindTooltip(feature.properties.name, {
                             permanent: false,
                             direction: "center",
@@ -183,14 +188,14 @@
                         });
                     }
 
-                    // Б. ЛОГІКА ПАДСВЯТЛЕННЯ (HOVER)
+                    // Логіка падсвятлення
                     layer.on({
                         mouseover: function(e) {
                             var l = e.target;
                             l.setStyle({
                                 weight: 3,
                                 color: '#666',
-                                fillOpacity: 0.8
+                                fillOpacity: 0.9
                             });
                             if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
                                 l.bringToFront();
@@ -204,7 +209,6 @@
             }).addTo(map);
         }
 
-        // Слухаем рух паўзунка
         slider.addEventListener('input', updateMap);
 
     </script>
