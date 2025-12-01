@@ -5,14 +5,14 @@
     <title>Каменны век на тэрыторыі Беларусі</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Падключэнне стыляў Leaflet (бібліятэка для мап) -->
+    <!-- Падключэнне стыляў Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
         body { margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; }
         #map { height: 100vh; width: 100%; }
         
-        /* Стыль для панэлі кіравання знізу */
+        /* Панэль кіравання */
         #controls {
             position: absolute;
             bottom: 40px;
@@ -28,7 +28,6 @@
             max-width: 700px;
         }
         
-        /* Стыль для адлюстравання года */
         #yearDisplay {
             font-size: 28px;
             font-weight: bold;
@@ -38,157 +37,175 @@
             min-width: 200px;
         }
         
-        /* Стыль паўзунка */
         input[type=range] {
             width: 100%;
             cursor: pointer;
             margin: 10px 0;
         }
 
-        /* Дадатковая інфармацыя */
         .legend-hint {
             font-size: 14px;
             color: #7f8c8d;
             margin-top: 5px;
         }
 
-        /* Стыль усплываючага акна (Popup) */
-        .custom-popup h3 {
-            margin: 0 0 5px 0;
-            color: #d35400;
-        }
-        .custom-popup p {
-            margin: 5px 0;
+        /* --- СТЫЛІ ДЛЯ ПОДПІСАЎ --- */
+        
+        /* Стыль для Ледавіка (заўсёды бачны) */
+        .glacier-label {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            color: #006994; /* Сіні колер */
             font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            text-shadow: 1px 1px 2px white;
         }
-        .custom-popup .dates {
+
+        /* Стыль для Культур (пры навядзенні) */
+        .culture-label {
             font-size: 12px;
-            color: #555;
-            font-style: italic;
-            border-top: 1px solid #eee;
-            padding-top: 5px;
-            margin-top: 5px;
-            display: block;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #999;
+            padding: 2px 5px;
+            border-radius: 3px;
         }
     </style>
 </head>
 <body>
 
     <div id="controls">
-        <span id="yearDisplay">Загрузка мапы...</span>
+        <span id="yearDisplay">Загрузка дадзеных...</span>
         <input type="range" id="yearSlider" min="0" max="100" value="0">
-        <div class="legend-hint">Рухайце паўзунок, каб падарожнічаць у часе</div>
+        <div class="legend-hint">Рухайце паўзунок, каб назіраць за гісторыяй (крок 1000 год)</div>
     </div>
 
     <div id="map"></div>
 
-    <!-- Падключэнне скрыптоў -->
+    <!-- Падключэнне скрыптоў Leaflet -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-ajax/dist/leaflet.ajax.min.js"></script>
 
     <script>
-        // 1. Ініцыялізацыя мапы (Цэнтр Беларусі)
+        // 1. Ініцыялізацыя мапы
         var map = L.map('map').setView([53.7, 28.0], 6);
 
-        // Фонавая мапа (Светлая і нейтральная - CartoDB Positron)
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
             subdomains: 'abcd',
             maxZoom: 19
         }).addTo(map);
 
-        // 2. Генерацыя "Разумнай шкалы часу"
+        // 2. Шкала часу (Адзіны крок 1000 гадоў)
         var timeline = [];
+        // Ад -30 000 да 0 (нараджэнне Хрыстова)
+        for (let y = -30000; y <= 0; y += 1000) { 
+            timeline.push(y); 
+        }
 
-        // Эпоха 1: Ледавік і Верхні палеаліт (ад -30 000 да -12 000)
-        // Крок: 1000 гадоў (бо падзеі адбываліся павольна)
-        for (let y = -30000; y < -12000; y += 1000) { timeline.push(y); }
-
-        // Эпоха 2: Фінальны палеаліт і Мезаліт (ад -12 000 да -5 000)
-        // Крок: 200 гадоў (больш падрабязна)
-        for (let y = -12000; y < -5000; y += 200) { timeline.push(y); }
-
-        // Эпоха 3: Неаліт і пераход да Бронзы (ад -5 000 да -1 500)
-        // Крок: 100 гадоў (максімальная дэталізацыя)
-        for (let y = -5000; y <= -1500; y += 100) { timeline.push(y); }
-
-        // Налада паўзунка
         var slider = document.getElementById('yearSlider');
         var display = document.getElementById('yearDisplay');
         
-        // Даўжыня паўзунка роўная колькасці кропак у часе
         slider.max = timeline.length - 1;
-        slider.value = 0; // Старт з самага пачатку
+        slider.value = 0;
 
-        // Функцыя для прыгожага фарматавання года
         function formatYear(y) {
-            if (y < 0) {
-                return Math.abs(y) + " да н.э.";
-            } else {
-                return y + " н.э.";
-            }
+            return y < 0 ? Math.abs(y) + " да н.э." : y + " н.э.";
         }
 
-        // 3. Загрузка дадзеных з файла
-        var geojsonLayer = new L.GeoJSON.AJAX("data/all_cultures.geojson", {
-            
-            // Стылізацыя (колер бярэцца з уласцівасцяў geojson)
-            style: function(feature) {
-                return {
-                    color: feature.properties.color || '#3388ff', // Калі колеру няма, будзе сіні
-                    weight: 2,
-                    fillOpacity: 0.5,
-                    opacity: 0.8
-                };
-            },
+        // Пераменныя для захоўвання дадзеных
+        var allData = null;      
+        var currentLayer = null; 
 
-            // Што паказваць пры кліку на аб'ект
-            onEachFeature: function (feature, layer) {
-                var props = feature.properties;
-                var popupContent = "<div class='custom-popup'>" +
-                    "<h3>" + props.name + "</h3>";
-                
-                if (props.description) {
-                    popupContent += "<p>" + props.description + "</p>";
-                }
-                
-                popupContent += "<span class='dates'>Час існавання: " + 
-                                formatYear(props.startYear) + " — " + formatYear(props.endYear) + 
-                                "</span></div>";
+        // 3. Загрузка дадзеных
+        fetch('data/all_cultures.geojson')
+            .then(response => response.json())
+            .then(data => {
+                allData = data; 
+                updateMap();    
+            })
+            .catch(error => {
+                console.error("Памылка загрузкі:", error);
+                display.innerText = "Памылка загрузкі файла data/all_cultures.geojson";
+            });
 
-                layer.bindPopup(popupContent);
-            },
+        // 4. Функцыя абнаўлення мапы
+        function updateMap() {
+            if (!allData) return; 
 
-            // Фільтрацыя (Галоўная магія часу)
-            filter: function(feature) {
-                // Бярэм бягучы год з паўзунка
-                var index = parseInt(slider.value);
-                var currentYear = timeline[index];
-                
-                // Правяраем: ці трапляе бягучы год у дыяпазон культуры
-                // (startYear <= currentYear <= endYear)
-                return (currentYear >= feature.properties.startYear && 
-                        currentYear <= feature.properties.endYear);
-            }
-        });
-
-        // Дадаем пласт на мапу
-        geojsonLayer.addTo(map);
-
-        // 4. Логіка руху паўзунка
-        slider.addEventListener('input', function() {
-            var index = parseInt(this.value);
+            var index = parseInt(slider.value);
             var currentYear = timeline[index];
-            
-            // Абнаўляем тэкст
             display.innerText = formatYear(currentYear);
-            
-            // Абнаўляем мапу (Leaflet перамалёўвае пласты згодна з фільтрам)
-            geojsonLayer.refresh(); 
-        });
 
-        // Ініцыялізацыя пры старце (паказваем першы год)
-        display.innerText = formatYear(timeline[0]);
+            // Выдаляем стары пласт
+            if (currentLayer) {
+                map.removeLayer(currentLayer);
+            }
+
+            // Ствараем новы пласт
+            currentLayer = L.geoJSON(allData, {
+                
+                // Фільтр па гадах
+                filter: function(feature) {
+                    return (currentYear >= feature.properties.startYear && 
+                            currentYear <= feature.properties.endYear);
+                },
+
+                // Стыль
+                style: function(feature) {
+                    return {
+                        fillColor: feature.properties.color || '#3388ff',
+                        weight: 1,
+                        opacity: 1,
+                        color: 'white',
+                        fillOpacity: 0.6
+                    };
+                },
+
+                // Паводзіны (Навядзенне і Подпісы)
+                onEachFeature: function(feature, layer) {
+                    
+                    // А. ЛОГІКА ПОДПІСАЎ
+                    if (feature.properties.type === 'glacier') {
+                        // Ледавік: пастаянны подпіс
+                        layer.bindTooltip(feature.properties.name, {
+                            permanent: true,
+                            direction: "center",
+                            className: "glacier-label"
+                        });
+                    } else {
+                        // Культуры: подпіс пры навядзенні
+                        layer.bindTooltip(feature.properties.name, {
+                            permanent: false,
+                            direction: "center",
+                            className: "culture-label"
+                        });
+                    }
+
+                    // Б. ЛОГІКА ПАДСВЯТЛЕННЯ (HOVER)
+                    layer.on({
+                        mouseover: function(e) {
+                            var l = e.target;
+                            l.setStyle({
+                                weight: 3,
+                                color: '#666',
+                                fillOpacity: 0.8
+                            });
+                            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                                l.bringToFront();
+                            }
+                        },
+                        mouseout: function(e) {
+                            currentLayer.resetStyle(e.target);
+                        }
+                    });
+                }
+            }).addTo(map);
+        }
+
+        // Слухаем рух паўзунка
+        slider.addEventListener('input', updateMap);
 
     </script>
 </body>
