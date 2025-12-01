@@ -39,7 +39,7 @@
             width: 100%;
             cursor: pointer;
             margin: 10px 0;
-            accent-color: #2c3e50; /* Колер паўзунка */
+            accent-color: #2c3e50;
         }
 
         .legend-hint {
@@ -49,7 +49,7 @@
             font-weight: 500;
         }
 
-        /* --- ЛЕГЕНДА (Новае) --- */
+        /* --- ЛЕГЕНДА --- */
         .legend-box {
             display: flex;
             justify-content: center;
@@ -71,11 +71,9 @@
         }
 
         /* --- КУРСОР І СТЫЛІ --- */
-        /* Калі наводзім на культуру - паказваем руку */
         .interactive-culture {
             cursor: pointer !important; 
         }
-        /* Калі наводзім на ледавік - звычайная стрэлка (бо ён проста фон) */
         .static-glacier {
             cursor: default !important;
         }
@@ -110,13 +108,11 @@
         <span id="yearDisplay">Загрузка...</span>
         <input type="range" id="yearSlider" min="0" max="100" value="0">
         
-        <!-- Больш зразумелая інструкцыя -->
         <div class="legend-hint">
             Рухайце паўзунок часу. <br>
             👇 <b>Навядзіце курсор на каляровыя вобласці</b>, каб даведацца назву культуры.
         </div>
 
-        <!-- Візуальная легенда -->
         <div class="legend-box">
             <div class="legend-item">
                 <span class="dot" style="background: #90E0EF;"></span> Ледавік
@@ -202,7 +198,6 @@
                         opacity: 1,
                         color: 'white',
                         fillOpacity: 0.65,
-                        // Дадаем клас для курсора:
                         className: feature.properties.type === 'culture' ? 'interactive-culture' : 'static-glacier'
                     };
                 },
@@ -227,7 +222,6 @@
                     layer.on({
                         mouseover: function(e) {
                             var l = e.target;
-                            // Ледавік не падсвечваем так моцна, толькі культуры
                             if (feature.properties.type === 'culture') {
                                 l.setStyle({
                                     weight: 2,
@@ -235,9 +229,7 @@
                                     fillOpacity: 0.9,  // Яркая заліўка
                                     dashArray: ''
                                 });
-                                if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
-                                    l.bringToFront();
-                                }
+                                // МЫ ВЫДАЛІЛІ bringToFront(), каб вялікія пласты не закрывалі маленькія
                             }
                         },
                         mouseout: function(e) {
