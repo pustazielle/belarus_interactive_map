@@ -1,11 +1,10 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="be">
 <head>
     <meta charset="utf-8" />
     <title>Каменны век на тэрыторыі Беларусі</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- Падключэнне стыляў Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
@@ -15,41 +14,73 @@
         /* Панэль кіравання */
         #controls {
             position: absolute;
-            bottom: 40px;
+            bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 1000;
             background: rgba(255, 255, 255, 0.95);
-            padding: 20px 30px;
-            border-radius: 15px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             text-align: center;
-            width: 85%;
-            max-width: 700px;
+            width: 90%;
+            max-width: 650px;
         }
         
         #yearDisplay {
-            font-size: 28px;
-            font-weight: bold;
+            font-size: 26px;
+            font-weight: 800;
             color: #2c3e50;
             display: block;
-            margin-bottom: 15px;
-            min-width: 200px;
+            margin-bottom: 10px;
         }
         
         input[type=range] {
             width: 100%;
             cursor: pointer;
             margin: 10px 0;
+            accent-color: #2c3e50; /* Колер паўзунка */
         }
 
         .legend-hint {
             font-size: 14px;
-            color: #7f8c8d;
-            margin-top: 5px;
+            color: #555;
+            margin-top: 8px;
+            font-weight: 500;
         }
 
-        /* --- СТЫЛІ ДЛЯ ПОДПІСАЎ --- */
+        /* --- ЛЕГЕНДА (Новае) --- */
+        .legend-box {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* --- КУРСОР І СТЫЛІ --- */
+        /* Калі наводзім на культуру - паказваем руку */
+        .interactive-culture {
+            cursor: pointer !important; 
+        }
+        /* Калі наводзім на ледавік - звычайная стрэлка (бо ён проста фон) */
+        .static-glacier {
+            cursor: default !important;
+        }
+
+        /* Подпісы */
         .glacier-label {
             background: transparent;
             border: none;
@@ -62,30 +93,45 @@
         }
 
         .culture-label {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: bold;
-            background: rgba(255, 255, 255, 0.9);
-            border: 1px solid #999;
-            padding: 2px 5px;
-            border-radius: 3px;
+            color: #333;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #aaa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
         }
     </style>
 </head>
 <body>
 
     <div id="controls">
-        <span id="yearDisplay">Загрузка дадзеных...</span>
+        <span id="yearDisplay">Загрузка...</span>
         <input type="range" id="yearSlider" min="0" max="100" value="0">
-        <div class="legend-hint">Рухайце паўзунок, каб назіраць за гісторыяй (крок 1000 год)</div>
+        
+        <!-- Больш зразумелая інструкцыя -->
+        <div class="legend-hint">
+            Рухайце паўзунок часу. <br>
+            👇 <b>Навядзіце курсор на каляровыя вобласці</b>, каб даведацца назву культуры.
+        </div>
+
+        <!-- Візуальная легенда -->
+        <div class="legend-box">
+            <div class="legend-item">
+                <span class="dot" style="background: #90E0EF;"></span> Ледавік
+            </div>
+            <div class="legend-item">
+                <span class="dot" style="background: #D4A373;"></span> Археалагічныя культуры
+            </div>
+        </div>
     </div>
 
     <div id="map"></div>
 
-    <!-- Падключэнне скрыптоў Leaflet -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // 1. Ініцыялізацыя мапы
         var map = L.map('map').setView([53.7, 28.0], 6);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -94,7 +140,6 @@
             maxZoom: 19
         }).addTo(map);
 
-        // 2. Шкала часу
         var timeline = [];
         for (let y = -30000; y <= 0; y += 1000) { 
             timeline.push(y); 
@@ -113,29 +158,22 @@
         var allData = null;      
         var currentLayer = null; 
 
-        // 3. Загрузка дадзеных
-        fetch('data/all_cultures.geojson')
+        // Загрузка з анты-кэшам
+        fetch('data/all_cultures.geojson?v=' + Math.random())
             .then(response => response.json())
             .then(data => {
                 allData = data; 
                 updateMap();    
             })
-            .catch(error => {
-                console.error("Памылка загрузкі:", error);
-                display.innerText = "Памылка загрузкі файла data/all_cultures.geojson";
-            });
+            .catch(error => { console.error(error); });
 
-        // --- НОВАЯ ФУНКЦЫЯ: Падлік плошчы для сартыроўкі ---
         function getFeatureArea(feature) {
             if (!feature.geometry) return 0;
             var layer = L.geoJSON(feature);
             var bounds = layer.getBounds();
-            var width = bounds.getEast() - bounds.getWest();
-            var height = bounds.getNorth() - bounds.getSouth();
-            return width * height;
+            return (bounds.getEast() - bounds.getWest()) * (bounds.getNorth() - bounds.getSouth());
         }
 
-        // 4. Функцыя абнаўлення мапы (ВЫПРАЎЛЕНАЯ)
         function updateMap() {
             if (!allData) return; 
 
@@ -143,23 +181,18 @@
             var currentYear = timeline[index];
             display.innerText = formatYear(currentYear);
 
-            if (currentLayer) {
-                map.removeLayer(currentLayer);
-            }
+            if (currentLayer) map.removeLayer(currentLayer);
 
-            // КРОК А: Фільтруем спіс уручную
             var visibleFeatures = allData.features.filter(function(feature) {
                 return (currentYear >= feature.properties.startYear && 
                         currentYear <= feature.properties.endYear);
             });
 
-            // КРОК Б: Сартуем (Вялікія -> Маленькія)
-            // Гэта гарантуе, што маленькія культуры лягуць ПАВЕРХ вялікіх
+            // Сартыроўка: Вялікія ўніз, маленькія наверх
             visibleFeatures.sort(function(a, b) {
                 return getFeatureArea(b) - getFeatureArea(a);
             });
 
-            // КРОК В: Ствараем пласт ужо з адсартаванымі дадзенымі
             currentLayer = L.geoJSON({type: "FeatureCollection", features: visibleFeatures}, {
                 
                 style: function(feature) {
@@ -168,12 +201,14 @@
                         weight: 1,
                         opacity: 1,
                         color: 'white',
-                        fillOpacity: 0.6
+                        fillOpacity: 0.65,
+                        // Дадаем клас для курсора:
+                        className: feature.properties.type === 'culture' ? 'interactive-culture' : 'static-glacier'
                     };
                 },
 
                 onEachFeature: function(feature, layer) {
-                    // Логіка подпісаў
+                    // Подпісы
                     if (feature.properties.type === 'glacier') {
                         layer.bindTooltip(feature.properties.name, {
                             permanent: true,
@@ -188,17 +223,21 @@
                         });
                     }
 
-                    // Логіка падсвятлення
+                    // Hover эфекты
                     layer.on({
                         mouseover: function(e) {
                             var l = e.target;
-                            l.setStyle({
-                                weight: 3,
-                                color: '#666',
-                                fillOpacity: 0.9
-                            });
-                            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
-                                l.bringToFront();
+                            // Ледавік не падсвечваем так моцна, толькі культуры
+                            if (feature.properties.type === 'culture') {
+                                l.setStyle({
+                                    weight: 2,
+                                    color: '#333',     // Цёмная мяжа
+                                    fillOpacity: 0.9,  // Яркая заліўка
+                                    dashArray: ''
+                                });
+                                if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                                    l.bringToFront();
+                                }
                             }
                         },
                         mouseout: function(e) {
@@ -210,7 +249,6 @@
         }
 
         slider.addEventListener('input', updateMap);
-
     </script>
 </body>
 </html>
